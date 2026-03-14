@@ -58,7 +58,8 @@ internal class Program
             
             return Results.Ok(new
             {
-                Message = text,
+                Message = "Success",
+                Status = 200,
             });
         });
     }
