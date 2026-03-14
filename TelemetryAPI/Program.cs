@@ -5,19 +5,19 @@ using RabbitMQ.Client;
 internal class Program
 {
     private const int PORT = 8080;
-    private static ConnectionFactory rabbitFactory;
+    private static IConnection rabbitConnection;
     
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
         var app = builder.Build();
         
-        rabbitFactory = new ConnectionFactory()
+        var factory = new ConnectionFactory()
         {
             HostName = "localhost"
         };
 
-        rabbitFactory = new ConnectionFactory();
+        rabbitConnection = await factory.CreateConnectionAsync();
         
         RegisterIncoming(app);
 
@@ -30,9 +30,8 @@ internal class Program
         {
             var bytes = System.Convert.FromBase64String(req.Data);
             var text = System.Text.Encoding.UTF8.GetString(bytes);
-
-            var conn = await rabbitFactory.CreateConnectionAsync();
-            var channel = await conn.CreateChannelAsync();
+            
+            var channel = await rabbitConnection.CreateChannelAsync();
 
             await channel.QueueDeclareAsync(
                 queue: "temperature-queue",
@@ -54,7 +53,6 @@ internal class Program
             );
             
             channel.Dispose();
-            conn.Dispose();
             
             return Results.Ok(new
             {
