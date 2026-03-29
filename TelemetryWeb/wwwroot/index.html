@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>System Telemetryczny – Alerty</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+  <header>
+    <h1> System Telemetryczny</h1>
+    <div id="status" class="status disconnected">● Łączenie...</div>
+  </header>
+
+  <main>
+    <section class="stats-bar">
+      <div class="stat">
+        <span class="stat-label">Wszystkich alertów</span>
+        <span class="stat-value" id="countTotal">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Krytyczne</span>
+        <span class="stat-value crit" id="countCrit">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Ostrzeżenia</span>
+        <span class="stat-value warn" id="countWarn">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">OK</span>
+        <span class="stat-value ok" id="countOk">0</span>
+      </div>
+    </section>
+
+    <section class="controls">
+      <button id="btnTest" onclick="sendTestAlert()">Wyślij testowy alert</button>
+      <button id="btnClear" onclick="clearAlerts()">Wyczyść</button>
+    </section>
+
+    <section class="alerts-container">
+      <h2>Powiadomienia w czasie rzeczywistym</h2>
+      <div id="alertList">
+        <p class="empty-msg">Brak alertów. Oczekiwanie na dane...</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- SignalR client library (CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
