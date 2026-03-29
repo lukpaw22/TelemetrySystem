@@ -17,6 +17,8 @@ internal class Program
         {
             HostName = "localhost"
         };
+        
+        //Test
 
         rabbitConnection = await factory.CreateConnectionAsync();
         
