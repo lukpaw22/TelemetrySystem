@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿using System.Text;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using RabbitMQ.Client;
 
@@ -19,17 +20,38 @@ internal class Program
 
         rabbitConnection = await factory.CreateConnectionAsync();
         
+        RegisterMiddleware(app);
         RegisterIncoming(app);
 
         app.Run($"http://localhost:{PORT}");
     }
 
+    static void RegisterMiddleware(WebApplication app)
+    {
+        app.Use( async (ctx, next) =>
+        {
+            ctx.Request.EnableBuffering();
+
+            using (var reader = new StreamReader( ctx.Request.Body, encoding: Encoding.UTF8, 
+                       detectEncodingFromByteOrderMarks: false, leaveOpen: true))
+            {
+                var body = await reader.ReadToEndAsync();
+                Console.WriteLine("Odebrano request! ------------------------------------");
+                Console.WriteLine(body);
+                Console.WriteLine("------------------------------------");
+
+                ctx.Request.Body.Position = 0;
+            }
+            await next(ctx);
+        });
+    }
+
     static void RegisterIncoming(WebApplication app)
     {
-        app.MapPost("/load", async (ReadingRequest req) =>
+        app.MapPost("/load", async (SensorReadingRequest req) =>
         {
-            var bytes = System.Convert.FromBase64String(req.Data);
-            var text = System.Text.Encoding.UTF8.GetString(bytes);
+            var bytes = Convert.FromBase64String(req.Data);
+            var text = Encoding.UTF8.GetString(bytes);
             
             var channel = await rabbitConnection.CreateChannelAsync();
 
@@ -63,4 +85,4 @@ internal class Program
     }
 }
 
-public record ReadingRequest(string Data);
+public record SensorReadingRequest(string Data);
