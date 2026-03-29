@@ -9,7 +9,7 @@ namespace TelemetryWorker.Services
 {
     public class InfluxService
     {
-        private readonly InfluxxDBClient _client;
+        private readonly InfluxDBClient _client;
         private readonly string _bucket = "telemetry";
         private readonly string _org = "my-org";
 
@@ -20,7 +20,7 @@ namespace TelemetryWorker.Services
         public async Task WriteAsync(TelemetryMessage msg)
         {
             var point = PointData
-            .Measurment("temperature")
+            .Measurement("temperature", msg.Temperature)
             .Tag("room", msg.Room)
             .Field("temperature")
             .Timestamp(msg.Timestamp, WritePrecision.Ns);

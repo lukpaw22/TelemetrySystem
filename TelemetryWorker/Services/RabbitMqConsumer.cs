@@ -8,47 +8,53 @@ using TelemetryWorker.Models;
 
 namespace TelemetryWorker.Services
 {
-    public class RabbitMqConsumer
+    public class RabbitMqConsumer : IAsyncDisposable
     {
-        private readonly TelemetryProcessor _processor;
+        private IConnection? _connection;
+        private IChannel? _channel;
 
-        public RabbitMqConsumer(TelemetryProcessor processor)
+        public async Task StartAsync(CancellationToken cancellationToken = default)
         {
-            _processor = processor;
-        }
+            var factory = new ConnectionFactory
+            {
+                HostName = "localhost",
+                UserName = "guest",
+                Password = "guest"
+            };
+            _connection = await factory.CreateConnectionAsync(cancellationToken);
+            _channel = await _connection.CreateChannelAsync(cancellationToken);
 
-        public void Start() 
-        {
-            var factory = new ConnectionFactory() { HostName = "localhost" };
-            var connection = factory.CreateConnection();
-            var channel = connection.CreateChannel();
+            await _channel.BasicQosAsync(
+                prefetchSize: 0,
+                prefetchCount: 10,
+                global: false,
+                cancellationToken: cancellationToken);
 
-            channel.QueueDeclare(queue: "telemetry",
+            await _channel.QueueDeclareAsync(
+                queue: "telemetry",
                 durable: true,
                 exclusive: false,
-                autoDelete: false);
+                autoDelete: false,
+                arguments: null,
+                cancellationToken: cancellationToken);
 
-            var consumer = new EventingBasicConsumer(channel);
+            var consumer = new AsyncEventingBasicConsumer(_channel);
 
-            consumer.Received += async (model, ea) =>
+            consumer.ReceivedAsync += async (sender, ea) =>
             {
                 var body = ea.Body.ToArray();
-                var json = Encoding.UTF8.GetString(body);
+                var message = Encoding.UTF8.GetString(body);
 
                 try
                 {
-                    var message = JsonSerializer.Deserialize<TelemetryMessage>(json);
-                    await _processor.ProcessAsync(message);
-                    channel.BasicAck(ea.DeliveryTag, false);
+                    Console.WriteLine($"Odebrano: {message}");
                 }
-                catch (Exception)
+                catch
                 {
-                    channel.BasicAck(ea.DeliveryTag, false, false);
+
                 }
             };
-            channel.BasicConsume(queue: "telemetry",
-                                 autoAck: false,
-                                 consumer: consumer);
+
         }
     }
 }

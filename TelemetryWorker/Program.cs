@@ -15,5 +15,5 @@ builder.Services.AddSingleton<RabbitMqConsumer>();
 var app = builder.Build();
 
 var consumer = app.Services.GetRequiredService<RabbitMqConsumer>();
-
+consumer.Start();
 app.Run();
