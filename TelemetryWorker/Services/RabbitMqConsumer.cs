@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
@@ -8,81 +8,50 @@ using TelemetryWorker.Models;
 
 namespace TelemetryWorker.Services
 {
-    public class RabbitMqConsumer : IAsyncDisposable
+    public class RabbitMqConsumer
     {
-        private IConnection? _connection;
-        private IChannel? _channel;
+        private readonly TelemetryProcessor _processor;
 
-        public async Task StartAsync(CancellationToken cancellationToken = default)
+        public RabbitMqConsumer(TelemetryProcessor processor)
         {
-            var factory = new ConnectionFactory
-            {
-                HostName = "localhost",
-                UserName = "guest",
-                Password = "guest"
-            };
-            _connection = await factory.CreateConnectionAsync(cancellationToken);
-            _channel = await _connection.CreateChannelAsync(cancellationToken);
+            _processor = processor;
+        }
 
-            await _channel.BasicQosAsync(
-                prefetchSize: 0,
-                prefetchCount: 10,
-                global: false,
-                cancellationToken: cancellationToken);
+        public void Start()
+        {
+            var factory = new ConnectionFactory() { HostName = "localhost" };
+            using var connection = factory.CreateConnection();
+            using var channel = connection.CreateModel();
 
-            await _channel.QueueDeclareAsync(
-                queue: "telemetry",
+            channel.QueueDeclare(queue: "telemetry",
                 durable: true,
                 exclusive: false,
-                autoDelete: false,
-                arguments: null,
-                cancellationToken: cancellationToken);
+                autoDelete: false);
 
-            var consumer = new AsyncEventingBasicConsumer(_channel);
+            var consumer = new EventingBasicConsumer(channel);
 
-            consumer.ReceivedAsync += async (sender, ea) =>
+            consumer.Received += async (model, ea) =>
             {
                 var body = ea.Body.ToArray();
-                var message = Encoding.UTF8.GetString(body);
+                var json = Encoding.UTF8.GetString(body);
 
                 try
                 {
-                    Console.WriteLine($"Odebrano: {message}");
-                    await ProcessMessageAsync(message, cancellationToken);
-                    await _channel.BasicAckAsync(
-                        deliveryTag: ea.DeliveryTag,
-                        multiple: false,
-                        cancellationToken: cancellationToken);
+                    var message = JsonSerializer.Deserialize<TelemetryMessage>(json);
+                    if (message != null)
+                    {
+                        await _processor.ProcessAsync(message);
+                    }
+                    channel.BasicAck(ea.DeliveryTag, false);
                 }
-                catch(Exception ex)
+                catch (Exception)
                 {
-                    Console.WriteLine($"Błąd: {ex.Message}");
-                    await _channel.BasicAckAsync(
-                        deliveryTag: ea.DeliveryTag,
-                        multiple: false,
-                        requeue: false,
-                        cancellationToken: cancellationToken);
+                    channel.BasicAck(ea.DeliveryTag, false);
                 }
             };
-            await _channel.BasicConsumeAsync(
-                queue: "telemetry",
-                autoAck: false,
-                consumer: consumer,
-                cancellationToken: cancellationToken);
-
-            Console.WriteLine("Async nasłuchiwanie kolejki...");
-        }
-        private async Task ProcessMessageAsync(string message, CancellationToken ct)
-        {
-            await Task.Delay(50, ct);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            if( _channel != null)
-                await _channel.CloseAsync();
-            if(_connection != null)
-                await _connection.CloseAsync();
+            channel.BasicConsume(queue: "telemetry",
+                                 autoAck: false,
+                                 consumer: consumer);
         }
     }
 }
