@@ -1,32 +1,55 @@
-﻿using System;
-using System.Collections.Generic;
+using System;
+using System.Globalization;
+using System.Net.Http;
 using System.Text;
-using InfluxDB.Client;
-using InfluxDB.Client.Writes;
+using System.Threading.Tasks;
 using TelemetryWorker.Models;
 
 namespace TelemetryWorker.Services
 {
-    public class InfluxService
+    public class InfluxService : IDisposable
     {
-        private readonly InfluxxDBClient _client;
-        private readonly string _bucket = "telemetry";
-        private readonly string _org = "my-org";
+        private readonly HttpClient _httpClient;
+        private readonly string _url;
+        private readonly string _bucket;
+        private readonly string _org;
 
-        public InfluxService(string url, string token)
+        public InfluxService(string url, string token, string bucket = "telemetry", string org = "default")
         {
-            _client = InfluxDBClientFactory.Create(url, token);
+            _httpClient = new HttpClient();
+            _httpClient.DefaultRequestHeaders.Add("Authorization", $"Token {token}");
+            _url = url.TrimEnd('/');
+            _bucket = bucket;
+            _org = org;
         }
+
         public async Task WriteAsync(TelemetryMessage msg)
         {
-            var point = PointData
-            .Measurment("temperature")
-            .Tag("room", msg.Room)
-            .Field("temperature")
-            .Timestamp(msg.Timestamp, WritePrecision.Ns);
+            var line = FormatLineProtocol(msg);
+            Console.WriteLine($"Sending: {line}");
 
-            using var writeApi = _client.GetWriteApiAsync();
-            await writeApi.WritePointAsync(point, _bucket,  _org);
+            var content = new StringContent(line, Encoding.UTF8, "text/plain");
+
+            var response = await _httpClient.PostAsync(
+                $"{_url}/api/v2/write?bucket={_bucket}&org={_org}&precision=s",
+                content);
+
+            var responseBody = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Response: {response.StatusCode} - {responseBody}");
+
+            response.EnsureSuccessStatusCode();
+        }
+
+        private string FormatLineProtocol(TelemetryMessage msg)
+        {
+            var epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var timestamp = (long)(msg.Timestamp.ToUniversalTime() - epoch).TotalSeconds;
+            return $"temperature,room={msg.Room} value={msg.Temperature.ToString(CultureInfo.InvariantCulture)} {timestamp}";
+        }
+
+        public void Dispose()
+        {
+            _httpClient?.Dispose();
         }
     }
 }

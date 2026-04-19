@@ -1,19 +1,30 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
+using TelemetryWorker.Models;
 using TelemetryWorker.Services;
 using TelemetryWorker.Validation;
 
-var builder = Host.CreateApplicationBuilder(args);
+Console.WriteLine("Telemetry Worker Starting...");
 
-builder.Services.AddSingleton<TelemetryValidator>();
-builder.Services.AddSingleton<InfluxService>(_ =>
-new InfluxService("http://localhost:8086", "TOKEN"));
-builder.Services.AddSingleton<TelemetryProcessor>();
-builder.Services.AddSingleton<RabbitMqConsumer>();
+var validator = new TelemetryValidator();
+var influxService = new InfluxService("http://localhost:8181", "");
 
-var app = builder.Build();
+var sampleMessage = new TelemetryMessage
+{
+    Room = "TestRoom",
+    Timestamp = DateTime.UtcNow,
+    Temperature = 25.5,
+    Hash = "test"
+};
 
-var consumer = app.Services.GetRequiredService<RabbitMqConsumer>();
+await influxService.WriteAsync(sampleMessage);
+Console.WriteLine("Sample data written to InfluxDB");
 
-app.Run();
+var processor = new TelemetryProcessor(validator, influxService);
+var consumer = new RabbitMqConsumer(processor);
+
+consumer.Start();
+
+Console.WriteLine("Press Ctrl+C to exit");
+Console.ReadLine();

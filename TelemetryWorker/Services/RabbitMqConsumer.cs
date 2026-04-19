@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
@@ -17,11 +17,11 @@ namespace TelemetryWorker.Services
             _processor = processor;
         }
 
-        public void Start() 
+        public void Start()
         {
             var factory = new ConnectionFactory() { HostName = "localhost" };
-            var connection = factory.CreateConnection();
-            var channel = connection.CreateChannel();
+            using var connection = factory.CreateConnection();
+            using var channel = connection.CreateModel();
 
             channel.QueueDeclare(queue: "telemetry",
                 durable: true,
@@ -38,12 +38,15 @@ namespace TelemetryWorker.Services
                 try
                 {
                     var message = JsonSerializer.Deserialize<TelemetryMessage>(json);
-                    await _processor.ProcessAsync(message);
+                    if (message != null)
+                    {
+                        await _processor.ProcessAsync(message);
+                    }
                     channel.BasicAck(ea.DeliveryTag, false);
                 }
                 catch (Exception)
                 {
-                    channel.BasicAck(ea.DeliveryTag, false, false);
+                    channel.BasicAck(ea.DeliveryTag, false);
                 }
             };
             channel.BasicConsume(queue: "telemetry",
