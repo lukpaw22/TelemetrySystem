@@ -14,7 +14,7 @@ namespace TelemetryWorker.Services
         private readonly string _bucket;
         private readonly string _org;
 
-        public InfluxService(string url, string token, string bucket = "telemetry", string org = "default")
+        public InfluxService(string url, string token, string bucket = "telemetry", string org = "my-org")
         {
             _httpClient = new HttpClient();
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Token {token}");
@@ -42,9 +42,8 @@ namespace TelemetryWorker.Services
 
         private string FormatLineProtocol(TelemetryMessage msg)
         {
-            var epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-            var timestamp = (long)(msg.Timestamp.ToUniversalTime() - epoch).TotalSeconds;
-            return $"temperature,room={msg.Room} value={msg.Temperature.ToString(CultureInfo.InvariantCulture)} {timestamp}";
+            var epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc); ;
+            return $"temperature,room={msg.Room} value={msg.Temperature.ToString(CultureInfo.InvariantCulture)} {msg.Timestamp}";
         }
 
         public void Dispose()

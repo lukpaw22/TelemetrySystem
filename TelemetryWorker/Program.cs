@@ -8,17 +8,8 @@ using TelemetryWorker.Validation;
 Console.WriteLine("Telemetry Worker Starting...");
 
 var validator = new TelemetryValidator();
-var influxService = new InfluxService("http://localhost:8181", "");
+var influxService = new InfluxService("http://localhost:8086", "hn7oSytvk1sX1J7pUsb0BJ_z-F-_GKSW3QYJfnzm8I15RcPqMJcTvXIImIUs5WBvsjdoupz49EVpSCpjMQBDJQ==");
 
-var sampleMessage = new TelemetryMessage
-{
-    Room = "TestRoom",
-    Timestamp = DateTime.UtcNow,
-    Temperature = 25.5,
-    Hash = "test"
-};
-
-await influxService.WriteAsync(sampleMessage);
 Console.WriteLine("Sample data written to InfluxDB");
 
 var processor = new TelemetryProcessor(validator, influxService);

@@ -20,11 +20,11 @@ namespace TelemetryWorker.Services
         public void Start()
         {
             var factory = new ConnectionFactory() { HostName = "localhost" };
-            using var connection = factory.CreateConnection();
-            using var channel = connection.CreateModel();
+            var connection = factory.CreateConnection();
+            var channel = connection.CreateModel();
 
             channel.QueueDeclare(queue: "telemetry",
-                durable: true,
+                durable: false,
                 exclusive: false,
                 autoDelete: false);
 
@@ -34,24 +34,28 @@ namespace TelemetryWorker.Services
             {
                 var body = ea.Body.ToArray();
                 var json = Encoding.UTF8.GetString(body);
-
+                Console.WriteLine($"Received: {json}");
                 try
                 {
                     var message = JsonSerializer.Deserialize<TelemetryMessage>(json);
+                    Console.WriteLine(message);
                     if (message != null)
                     {
                         await _processor.ProcessAsync(message);
                     }
                     channel.BasicAck(ea.DeliveryTag, false);
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
                     channel.BasicAck(ea.DeliveryTag, false);
+                    throw e;
                 }
             };
             channel.BasicConsume(queue: "telemetry",
                                  autoAck: false,
                                  consumer: consumer);
+
+            Console.ReadLine();
         }
     }
 }

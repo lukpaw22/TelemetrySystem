@@ -5,7 +5,7 @@ using RabbitMQ.Client;
 
 internal class Program
 {
-    private const int PORT = 8080;
+    private const int PORT = 8282;
     private static IConnection rabbitConnection;
     
     static async Task Main(string[] args)
@@ -58,7 +58,7 @@ internal class Program
             var channel = await rabbitConnection.CreateChannelAsync();
 
             await channel.QueueDeclareAsync(
-                queue: "temperature-queue",
+                queue: "telemetry",
                 durable: false,
                 exclusive: false,
                 autoDelete: false,
@@ -70,7 +70,7 @@ internal class Program
             
             await channel.BasicPublishAsync(
                 "",
-                "temperature-queue",
+                "telemetry",
                 mandatory: true,
                 basicProperties: new BasicProperties(),
                 body: System.Text.Encoding.UTF8.GetBytes(text)

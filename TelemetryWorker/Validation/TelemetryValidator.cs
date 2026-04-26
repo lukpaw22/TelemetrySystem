@@ -12,8 +12,6 @@ namespace TelemetryWorker.Validation
         {
             if(string.IsNullOrEmpty(msg.Room))
                 return false;
-            if(msg.Timestamp > DateTime.UtcNow.AddMinutes(5))
-                return false;
             if(msg.Temperature < -100 || msg.Temperature > 200)
                 return false;
 
@@ -21,8 +19,9 @@ namespace TelemetryWorker.Validation
         }
         public bool ValidateHash(TelemetryMessage msg)
         {
-            var raw = $"{msg.Room}{msg.Timestamp:o}{msg.Temperature}";
+            var raw = $"{msg.Room}{msg.Timestamp}{msg.Temperature}";
             var computed = HashHelper.ComputeHash(raw);
+            Console.WriteLine(computed);
 
             return computed == msg.Hash;
         }
