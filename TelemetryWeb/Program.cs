@@ -1,11 +1,10 @@
-using SignalRApp.Hubs;
+using TelemetryWeb.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddSignalR();
 
-// CORS potrzebne gdy frontend odpytuje z innego portu
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -16,17 +15,13 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-app.UseStaticFiles();   // serwuj pliki z wwwroot/
+app.UseStaticFiles();
 app.UseCors();
 app.UseRouting();
 
-// Kontrolery – webhook od InfluxDB trafi tutaj
 app.MapControllers();
-
-// Hub SignalR – klienci łączą się pod /alertHub
 app.MapHub<AlertHub>("/alertHub");
 
-// Przekieruj / na index.html
 app.MapGet("/", () => Results.Redirect("/index.html"));
 
-app.Run();
+app.Run("http://0.0.0.0:5050");

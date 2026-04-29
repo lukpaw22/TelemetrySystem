@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace SignalRApp.Models;
+namespace TelemetryWeb.Models;
 
 /// <summary>
 /// Model payloadu webhooka wysyłanego przez InfluxDB po wyzwoleniu alertu.

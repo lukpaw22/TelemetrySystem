@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
 using RabbitMQ.Client;
@@ -12,50 +10,89 @@ namespace TelemetryWorker.Services
     {
         private readonly TelemetryProcessor _processor;
 
+        // Nazwy kolejek i exchange jako stałe — łatwo znaleźć i zmienić
+        public const string MainQueue  = "telemetry";
+        public const string DlqName    = "telemetry-dlq";
+        public const string DlxName    = "telemetry-dlx";
+
         public RabbitMqConsumer(TelemetryProcessor processor)
         {
             _processor = processor;
         }
 
-        public void Start()
+        public async Task StartAsync()
         {
-            var factory = new ConnectionFactory() { HostName = "localhost" };
-            var connection = factory.CreateConnection();
-            var channel = connection.CreateModel();
+            var factory    = new ConnectionFactory() { HostName = "localhost" };
+            var connection = await factory.CreateConnectionAsync();
+            var channel    = await connection.CreateChannelAsync();
 
-            channel.QueueDeclare(queue: "telemetry",
-                durable: false,
+            // ── Krok 1: Dead-Letter Exchange ────────────────────────────────
+            // Exchange, na który trafią wiadomości odrzucone przez NACK
+            await channel.ExchangeDeclareAsync(
+                exchange: DlxName,
+                type: ExchangeType.Direct,
+                durable: true);
+
+            // ── Krok 2: Dead-Letter Queue ───────────────────────────────────
+            // Tu lądują wszystkie błędne / nieprzeszłe walidacji wiadomości
+            await channel.QueueDeclareAsync(
+                queue: DlqName,
+                durable: true,
                 exclusive: false,
-                autoDelete: false);
+                autoDelete: false,
+                arguments: null);
 
-            var consumer = new EventingBasicConsumer(channel);
+            // Powiąż DLQ z DLX (routing key = nazwa kolejki głównej)
+            await channel.QueueBindAsync(
+                queue: DlqName,
+                exchange: DlxName,
+                routingKey: MainQueue);
 
-            consumer.Received += async (model, ea) =>
+            // ── Krok 3: Kolejka główna z DLQ ───────────────────────────────
+            // x-dead-letter-exchange: dokąd trafia NACK-owana wiadomość
+            // x-dead-letter-routing-key: jaki routing key dostaje po odrzuceniu
+            await channel.QueueDeclareAsync(
+                queue: MainQueue,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: new Dictionary<string, object?>
+                {
+                    { "x-dead-letter-exchange",    DlxName   },
+                    { "x-dead-letter-routing-key", MainQueue }
+                });
+
+            // ── Krok 4: Konsument ───────────────────────────────────────────
+            var consumer = new AsyncEventingBasicConsumer(channel);
+
+            consumer.ReceivedAsync += async (model, ea) =>
             {
                 var body = ea.Body.ToArray();
                 var json = Encoding.UTF8.GetString(body);
-                Console.WriteLine($"Received: {json}");
+
                 try
                 {
                     var message = JsonSerializer.Deserialize<TelemetryMessage>(json);
-                    Console.WriteLine(message);
-                    if (message != null)
-                    {
-                        await _processor.ProcessAsync(message);
-                    }
-                    channel.BasicAck(ea.DeliveryTag, false);
+                    await _processor.ProcessAsync(message!);
+
+                    // Potwierdzenie poprawnego przetworzenia
+                    await channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    Console.WriteLine($"[Worker] ✓ Przetworzono: {message!.Room} {message.Temperature}°C");
                 }
-                catch (Exception e)
+                catch (Exception ex)
                 {
-                    channel.BasicAck(ea.DeliveryTag, false);
-                    throw e;
+                    Console.WriteLine($"[Worker] ✗ Błąd: {ex.Message} — wiadomość trafia do DLQ");
+                    // requeue: false → wiadomość idzie do DLQ (nie wraca do głównej kolejki)
+                    await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false);
                 }
             };
-            channel.BasicConsume(queue: "telemetry",
-                                 autoAck: false,
-                                 consumer: consumer);
 
-            Console.ReadLine();
+            await channel.BasicConsumeAsync(
+                queue: MainQueue,
+                autoAck: false,
+                consumer: consumer);
+
+            Console.WriteLine($"[Worker] Nasłuchiwanie na '{MainQueue}' | DLQ: '{DlqName}'");
         }
     }
 }

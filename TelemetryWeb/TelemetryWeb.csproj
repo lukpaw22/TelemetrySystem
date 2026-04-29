@@ -4,9 +4,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>SignalRApp</RootNamespace>
+    <RootNamespace>TelemetryWeb</RootNamespace>
   </PropertyGroup>
 
-  <!-- SignalR jest wbudowany w ASP.NET Core 8 – brak dodatkowych paczek -->
+  <!-- SignalR jest wbudowany w ASP.NET Core – brak dodatkowych paczek -->
 
 </Project>

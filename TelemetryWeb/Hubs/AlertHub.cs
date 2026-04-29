@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 
-namespace SignalRApp.Hubs;
+namespace TelemetryWeb.Hubs;
 
 /// <summary>
 /// SignalR Hub – punkt połączenia dla klientów przeglądarki.

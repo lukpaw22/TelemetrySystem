@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using SignalRApp.Hubs;
-using SignalRApp.Models;
+using TelemetryWeb.Hubs;
+using TelemetryWeb.Models;
 
-namespace SignalRApp.Controllers;
+namespace TelemetryWeb.Controllers;
 
 /// <summary>
 /// Kontroler przyjmujący webhooki z InfluxDB.
@@ -38,7 +38,6 @@ public class WebhookController : ControllerBase
         _logger.LogInformation("[WEBHOOK] Odebrano alert z InfluxDB: {CheckName} poziom={Level}",
                                 payload.CheckName, payload.Level);
 
-        // Mapowanie payloadu InfluxDB → model wysyłany do UI
         var notification = new AlertNotification
         {
             CheckName   = payload.CheckName,
@@ -50,7 +49,6 @@ public class WebhookController : ControllerBase
             Measurement = payload.Measurement
         };
 
-        // Rozgłoszenie do WSZYSTKICH połączonych klientów
         await _hubContext.Clients.All.SendAsync("ReceiveAlert", notification);
 
         _logger.LogInformation("[WEBHOOK] Alert rozgłoszony do klientów SignalR.");
